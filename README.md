@@ -1,2 +1,3 @@
 # From-Pixels-to-Position
-Image Analysis Project
+## Write random notes and report draft in notes
+## Write scripts in the relevant folder
