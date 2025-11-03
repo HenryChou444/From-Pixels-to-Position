@@ -10,6 +10,7 @@ import sensor
 import os
 import time
 from pyb import millis
+from pyb import Timer
 from utime import sleep_ms
 
 
@@ -79,6 +80,19 @@ save_image_first_time = True
 log_data_first_time = True
 
 
+
+# --- Timer/Counter Logic ---
+ms_counter = 0
+def tick(timer):
+    global ms_counter
+    ms_counter += 1
+
+# Timer from pyb
+tim = Timer(4, freq=1000)
+#Freq is in Hz, can be changed to anything
+# '4' is the timer ID, other available timers are : 2, 3, 4, 7 , 8, 12-17 (from docs)
+tim.callback(tick)
+
 # We need to use a timer and interrupt to make sure each image
 # is taken every x-amount of seconds, defined by FPS
 
@@ -87,7 +101,8 @@ while (image_taken < IMAGES):
         # Wait 1sec
         sleep_ms(1000)
         # Take image
-        timestamp = millis() - starttime
+        #timestamp = millis() - starttime
+        timestamp = ms_counter
         image = sensor.snapshot()
 
         save_image(image, timestamp)
