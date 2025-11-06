@@ -253,7 +253,7 @@ while DESIRED_NUM_OF_IMG > image_count:
 
                     angle_change = abs(roll - last_angles[0]) + abs(pitch - last_angles[1]) + abs(yaw - last_angles[2])
                     if angle_change > 0.5:
-                        print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
+                        #print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
                         last_angles = [roll, pitch, yaw]
                 
                 # Reset after processing this pair
