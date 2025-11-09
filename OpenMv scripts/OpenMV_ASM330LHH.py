@@ -90,8 +90,6 @@ sensor.skip_frames(time=2000)
 init_sensor()
 madgwick = Madgwick()
 last_time = time.ticks_ms()
-gyro_data = [0.0, 0.0, 0.0]
-accel_data = [0, 0, 0]
 MOVEMENT_THRESHOLD = 2.0
 last_angles = [0.0, 0.0, 0.0]
 
@@ -103,6 +101,10 @@ while True:
 
     if fifo_count > 0:
         fifo_data = read_reg(REG_FIFO_DATA_OUT_TAG, fifo_count * 7)
+        
+        # Process each sample in the FIFO
+        gyro_data = None
+        accel_data = None
 
         for i in range(0, len(fifo_data), 7):
             tag = (fifo_data[i] >> 3) & 0x1F
@@ -120,22 +122,27 @@ while True:
             elif tag == 0x02:
                 accel_data = [x, y, z]
 
-        if gyro_data != [0.0, 0.0, 0.0] and accel_data != [0, 0, 0]:
-            current_time = time.ticks_ms()
-            dt = time.ticks_diff(current_time, last_time) / 1000.0
-            last_time = current_time
+            # Update filter when we have both gyro and accel data
+            if gyro_data is not None and accel_data is not None:
+                current_time = time.ticks_ms()
+                dt = time.ticks_diff(current_time, last_time) / 1000.0
+                last_time = current_time
 
-            total_gyro = abs(gyro_data[0]) + abs(gyro_data[1]) + abs(gyro_data[2])
+                total_gyro = abs(gyro_data[0]) + abs(gyro_data[1]) + abs(gyro_data[2])
 
-            if total_gyro > MOVEMENT_THRESHOLD:
-                gx = gyro_data[0] * 0.01745
-                gy = gyro_data[1] * 0.01745
-                gz = gyro_data[2] * 0.01745
+                if total_gyro > MOVEMENT_THRESHOLD:
+                    gx = gyro_data[0] * 0.01745
+                    gy = gyro_data[1] * 0.01745
+                    gz = gyro_data[2] * 0.01745
 
-                madgwick.update(gx, gy, gz, accel_data[0], accel_data[1], accel_data[2], dt)
-                roll, pitch, yaw = madgwick.get_angles()
+                    madgwick.update(gx, gy, gz, accel_data[0], accel_data[1], accel_data[2], dt)
+                    roll, pitch, yaw = madgwick.get_angles()
 
-                angle_change = abs(roll - last_angles[0]) + abs(pitch - last_angles[1]) + abs(yaw - last_angles[2])
-                if angle_change > 0.5:
-                    print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
-                    last_angles = [roll, pitch, yaw]
+                    angle_change = abs(roll - last_angles[0]) + abs(pitch - last_angles[1]) + abs(yaw - last_angles[2])
+                    if angle_change > 0.5:
+                        print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
+                        last_angles = [roll, pitch, yaw]
+                
+                # Reset after processing this pair
+                gyro_data = None
+                accel_data = None
