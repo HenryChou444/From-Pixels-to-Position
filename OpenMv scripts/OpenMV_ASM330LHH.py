@@ -52,7 +52,6 @@ def read_reg(reg, nbytes=1):
     return data
 
 def init_sensor():
-def init_sensor():
     write_reg(REG_CTRL3_C, 0x01)
     time.sleep_ms(100)
     write_reg(REG_CTRL4_C, 0x06)
@@ -113,6 +112,72 @@ def send_and_empty_buffer(buf, data_file):
     data_file.flush()   #Make sure all data get written
     buf.clear()         #Empty data buffer
 
+def calibrate_gyro(gyro_offset):
+    counter = 0
+    gyro_data = [0,0,0]
+
+    while(counter < 500):
+        fifo_status = read_reg(REG_FIFO_STATUS1, 2)
+        fifo_count = fifo_status[0] | ((fifo_status[1] & 0x03) << 8)
+
+        if fifo_count > 0:
+            fifo_data = read_reg(REG_FIFO_DATA_OUT_TAG, fifo_count * 7)
+            
+            for i in range(0, len(fifo_data), 7):
+                tag = (fifo_data[i] >> 3) & 0x1F
+
+                x = fifo_data[i+1] | (fifo_data[i+2] << 8)
+                y = fifo_data[i+3] | (fifo_data[i+4] << 8)
+                z = fifo_data[i+5] | (fifo_data[i+6] << 8)
+
+                if x > 32767: x -= 65536
+                if y > 32767: y -= 65536
+                if z > 32767: z -= 65536
+
+                if tag == 0x01:
+                    gyro_data += [x, y, z]
+                    counter += 1             
+        time.sleep_ms(5)
+    gyro_offset = gyro_data / counter
+
+def sync_timestamp():
+    time_start = time.ticks_us() / 1000000;
+    timestamp0 = read_reg(REG_TIMESTAMP0_REG)
+    timestamp1 = read_reg(REG_TIMESTAMP1_REG)
+    timestamp2 = read_reg(REG_TIMESTAMP2_REG)
+    timestamp3 = read_reg(REG_TIMESTAMP3_REG)
+    time_end = time.ticks_us() / 1000000;
+
+    imu_ticks = (timestamp3[0] << 24) | (timestamp2[0] << 16) | (timestamp1[0] << 8) | timestamp0[0]
+    imu_timestamp = imu_ticks * 25 / 1000000
+    time_offset = imu_timestamp - (time_start - (time_end - time_start) / 2)
+    print(f"IMU offset time: {time_offset}s")
+
+def create_data_files(data_name, image_name):
+    global data_file
+    global image_file
+
+    data_file_name = f"/{data_name}.csv"
+    image_file_name = f"/{image_name}.bin"
+    try:
+        data_file = open(data_file_name, 'w')
+        data_file.write("Timestamp, Data_type, Gyro x, Gyro y, Gyro z, Accel x, Accel y, Accel z, Filter yaw, Filter pitch, Filter roll, Image_name \n")
+        image_file = open(image_file_name, 'wb') #wb = write binary
+        print("Data files on sd card has been made")
+
+    except Exception as e:
+        print(f"Error when creating data and image file: {e}")
+
+def take_and_save_image(img_file, data_buf, img_count, data_count):
+        global time_start
+
+        timestamp = time.ticks_us() / 1000000 - time_start
+        img = sensor.snapshot()
+        img_file.write(img.bytearray())
+        data_buf.append(f"{timestamp}, IMG_DATA, , , , , , , , , , Image_{img_count:05d} \n")
+        img_count += 1
+        data_count += 1
+
 # --- Timer/Counter Logic ---
 def tick(timer):
     global TAKE_IMAGE
@@ -120,9 +185,16 @@ def tick(timer):
 
 # Timer from pyb
 tim = Timer(4, freq=10)
-#Freq is in Hz, can be changed to anything
-# '4' is the timer ID, other available timers are : 2, 3, 4, 7 , 8, 12-17 (from docs)
 tim.callback(tick)
+
+
+MOVEMENT_THRESHOLD = 2.0
+last_angles = [0.0, 0.0, 0.0]
+gyro_offset = [0,0,0]
+time_offset = 0
+data_buf = []
+image_count = 0
+data_count = 0
 
 
 # --- Main program ---
@@ -134,48 +206,17 @@ sensor.skip_frames(time=2000)
 init_sensor()
 madgwick = Madgwick()
 last_time = time.ticks_ms()
-MOVEMENT_THRESHOLD = 2.0
-last_angles = [0.0, 0.0, 0.0]
-data_buf = []
-image_count = 0
-data_count = 0
-
-time_start = time.ticks_us() / 1000000;
-timestamp0 = read_reg(REG_TIMESTAMP0_REG)
-timestamp1 = read_reg(REG_TIMESTAMP1_REG)
-timestamp2 = read_reg(REG_TIMESTAMP2_REG)
-timestamp3 = read_reg(REG_TIMESTAMP3_REG)
-time_end = time.ticks_us() / 1000000;
-
-imu_ticks = (timestamp3[0] << 24) | (timestamp2[0] << 16) | (timestamp1[0] << 8) | timestamp0[0]
-imu_timestamp = imu_ticks * 25 / 1000000
-time_offset = imu_timestamp - (time_start - (time_end - time_start) / 2)
-print(f"IMU offset time: {time_offset}s")
-
-data_file_name = "/data.csv"
-image_file_name = "/image.bin"
-try:
-    data_file = open(data_file_name, 'w')
-    data_file.write("Timestamp, Data_type, Gyro x, Gyro y, Gyro z, Accel x, Accel y, Accel z, Filter yaw, Filter pitch, Filter roll, Image_name \n")
-    image_file = open(image_file_name, 'wb') #wb = write binary
-    print("Data files on sd card has been made")
-
-except Exception as e:
-    print(f"Error when creating data and image file: {e}")
+sync_timestamp(time_offset)
+calibrate_gyro(gyro_offset)
+create_data_files("data", "image")
 
 time_start = time.ticks_us() / 1000000
 time_offset += time_start
-print("Data harvest started!")
 
+print("Data harvest started!")
 while DESIRED_NUM_OF_IMG > image_count:
     if TAKE_IMAGE:
-        timestamp = time.ticks_us() / 1000000 - time_start
-        img = sensor.snapshot()
-        image_file.write(img.bytearray())
-        data_buf.append(f"{timestamp}, IMG_DATA, , , , , , , , , , Image_{image_count:05d} \n")
-        image_count += 1
-        data_count += 1
-
+        take_and_save_image(image_file, data_buf, image_count, data_count)
 
     fifo_status = read_reg(REG_FIFO_STATUS1, 2)
     fifo_count = fifo_status[0] | ((fifo_status[1] & 0x03) << 8)
@@ -199,7 +240,7 @@ while DESIRED_NUM_OF_IMG > image_count:
             if z > 32767: z -= 65536
 
             if tag == 0x01:
-                gyro_data = [x * 0.004375, y * 0.004375, z * 0.004375]
+                gyro_data = [(x - gyro_offset[0]) * 0.004375, (y - gyro_offset[1]) * 0.004375, (z - gyro_offset[2]) * 0.004375]
                 GYRO_FLAG = True
             elif tag == 0x02:
                 accel_data = [x, y, z]
