@@ -219,6 +219,9 @@ while DESIRED_NUM_OF_IMG > image_count:
         take_and_save_image(image_file, data_buf, image_count, data_count)
 
     fifo_status = read_reg(REG_FIFO_STATUS1, 2)
+    if(fifo_status[1] & 0x40):
+        print("!!!! FIFO Overflow detected !!!!")
+        
     fifo_count = fifo_status[0] | ((fifo_status[1] & 0x03) << 8)
 
     if fifo_count > 0:
