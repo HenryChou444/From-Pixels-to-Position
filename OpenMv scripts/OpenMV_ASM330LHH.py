@@ -1,4 +1,5 @@
 # ASM330LHH Gyroscope with Madgwick Filter
+# ASM330LHH Gyroscope with Madgwick Filter
 
 import sensor
 import time
@@ -51,10 +52,18 @@ def read_reg(reg, nbytes=1):
     return data
 
 def init_sensor():
+def init_sensor():
     write_reg(REG_CTRL3_C, 0x01)
     time.sleep_ms(100)
     write_reg(REG_CTRL4_C, 0x06)
+    time.sleep_ms(100)
+    write_reg(REG_CTRL4_C, 0x06)
     write_reg(REG_CTRL6_C, 0x05)
+    write_reg(REG_FIFO_CTRL3, 0x99)
+    write_reg(REG_CTRL1_XL, 0x90)
+    write_reg(REG_CTRL2_G, 0x92)
+    write_reg(REG_CTRL10_C, 0x20)
+    write_reg(REG_FIFO_CTRL4, 0x56)
     write_reg(REG_FIFO_CTRL3, 0x99)
     write_reg(REG_CTRL1_XL, 0x90)
     write_reg(REG_CTRL2_G, 0x92)
@@ -219,9 +228,19 @@ while DESIRED_NUM_OF_IMG > image_count:
                 current_time = time.ticks_ms()
                 dt = time.ticks_diff(current_time, last_time) / 1000.0
                 last_time = current_time
+            # Update filter when we have both gyro and accel data
+            if gyro_data is not None and accel_data is not None:
+                current_time = time.ticks_ms()
+                dt = time.ticks_diff(current_time, last_time) / 1000.0
+                last_time = current_time
 
                 total_gyro = abs(gyro_data[0]) + abs(gyro_data[1]) + abs(gyro_data[2])
+                total_gyro = abs(gyro_data[0]) + abs(gyro_data[1]) + abs(gyro_data[2])
 
+                if total_gyro > MOVEMENT_THRESHOLD:
+                    gx = gyro_data[0] * 0.01745
+                    gy = gyro_data[1] * 0.01745
+                    gz = gyro_data[2] * 0.01745
                 if total_gyro > MOVEMENT_THRESHOLD:
                     gx = gyro_data[0] * 0.01745
                     gy = gyro_data[1] * 0.01745
@@ -229,10 +248,12 @@ while DESIRED_NUM_OF_IMG > image_count:
 
                     madgwick.update(gx, gy, gz, accel_data[0], accel_data[1], accel_data[2], dt)
                     roll, pitch, yaw = madgwick.get_angles()
+                    madgwick.update(gx, gy, gz, accel_data[0], accel_data[1], accel_data[2], dt)
+                    roll, pitch, yaw = madgwick.get_angles()
 
                     angle_change = abs(roll - last_angles[0]) + abs(pitch - last_angles[1]) + abs(yaw - last_angles[2])
                     if angle_change > 0.5:
-                        #print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
+                        print("Roll: %.1f  Pitch: %.1f  Yaw: %.1f" % (roll, pitch, yaw))
                         last_angles = [roll, pitch, yaw]
                 
                 # Reset after processing this pair
