@@ -1,6 +1,7 @@
 # Prerequisites
 *.d
-
+# PDF Files
+*.pdf
 # Compiled Object files
 *.slo
 *.lo
