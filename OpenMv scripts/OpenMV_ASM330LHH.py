@@ -144,7 +144,7 @@ time_offset = imu_timestamp - (time_start - (time_end - time_start) / 2)
 print(f"IMU offset time: {time_offset}s")
 
 data_file_name = "/data.csv"
-image_file_name = "image.bin"
+image_file_name = "/image.bin"
 try:
     data_file = open(data_file_name, 'w')
     data_file.write("Timestamp, Data_type, Gyro x, Gyro y, Gyro z, Accel x, Accel y, Accel z, Filter yaw, Filter pitch, Filter roll, Image_name \n")
@@ -250,3 +250,4 @@ os.umount("/")
 time.sleep(0.5)
 
 print("Finished")
+
