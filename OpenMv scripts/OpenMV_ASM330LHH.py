@@ -217,6 +217,7 @@ print("Data harvest started!")
 while DESIRED_NUM_OF_IMG > image_count:
     if TAKE_IMAGE:
         take_and_save_image(image_file, data_buf, image_count, data_count)
+        TAKE_IMAGE = True
 
     fifo_status = read_reg(REG_FIFO_STATUS1, 2)
     if(fifo_status[1] & 0x40):
@@ -315,4 +316,5 @@ os.umount("/")
 time.sleep(0.5)
 
 print("Finished")
+
 
