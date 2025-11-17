@@ -71,6 +71,7 @@ ipch/
 *.VC.db
 *.opendb
 *.ipch
+*.py.autosave
 # Keep these in Git:
 !*.sln
 !*.vcxproj
