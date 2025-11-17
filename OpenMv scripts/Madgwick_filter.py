@@ -1,5 +1,12 @@
 import math
 
+
+#madgwick = Madgwick()
+#last_time = time.ticks_ms()
+#MOVEMENT_THRESHOLD = 2.0
+#last_angles = [0.0, 0.0, 0.0]
+
+
 class Madgwick:
     def __init__(self):
         self.q = [1.0, 0.0, 0.0, 0.0]
