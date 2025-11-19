@@ -12,6 +12,11 @@
 *.o
 *.obj
 
+# other
+*.exec
+*.exe
+*Makefile
+
 # Precompiled Headers
 *.gch
 *.pch

@@ -143,15 +143,15 @@ def send_and_empty_buffer(buf, data_file):
     buf.clear()         #Empty data buffer
 
 def get_offset_time():
-    time_start = time.ticks_us() / 1000000;
+    time_start = time.ticks_us();
     timestamp0 = read_reg(REG_TIMESTAMP0_REG)
     timestamp1 = read_reg(REG_TIMESTAMP1_REG)
     timestamp2 = read_reg(REG_TIMESTAMP2_REG)
     timestamp3 = read_reg(REG_TIMESTAMP3_REG)
-    time_end = time.ticks_us() / 1000000;
+    time_end = time.ticks_us();
 
     imu_ticks = (timestamp3[0] << 24) | (timestamp2[0] << 16) | (timestamp1[0] << 8) | timestamp0[0]
-    imu_timestamp = imu_ticks * 25 / 1000000
+    imu_timestamp = imu_ticks * 25
     time_offset = imu_timestamp - (time_start - (time_end - time_start) / 2)
 
     return time_offset
@@ -179,7 +179,7 @@ image_count = 0
 data_count = 0
 
 time_offset = get_offset_time()
-print(f"IMU offset time: {time_offset}s")
+print(f"IMU offset time: {time_offset}us")
 
 
 try:
@@ -192,13 +192,13 @@ except Exception as e:
 
 
 
-time_start = time.ticks_us() / 1000000
+time_start = time.ticks_us()
 time_offset += time_start
 print("Data harvest started!")
 
 while DESIRED_NUM_OF_IMG > image_count:
     if TAKE_IMAGE:
-        timestamp = time.ticks_us() / 1000000 - time_start
+        timestamp = time.ticks_us() - time_start
         img = sensor.snapshot()
         image_file.write(img.bytearray())
         data_buf.append(f"{timestamp}, IMG_DATA, , , , , , , , , , Image_{image_count:05d} \n")
@@ -209,6 +209,9 @@ while DESIRED_NUM_OF_IMG > image_count:
 
     fifo_status = read_reg(REG_FIFO_STATUS1, 2)
     fifo_count = fifo_status[0] | ((fifo_status[1] & 0x03) << 8)
+
+    if(fifo_status[1] & 0x40):
+        print("overflow")
 
     if fifo_count > 0:
         fifo_data = read_reg(REG_FIFO_DATA_OUT_TAG, fifo_count * 7)
@@ -225,14 +228,15 @@ while DESIRED_NUM_OF_IMG > image_count:
             if z > 32767: z -= 65536
 
             if tag == 0x01:
-                gyro_data = [x * 0.004375, y * 0.004375, z * 0.004375]
+                #gyro_data = [x * 0.004375, y * 0.004375, z * 0.004375]
+                gyro_data = [x,y,z]
                 GYRO_FLAG = True
             elif tag == 0x02:
                 accel_data = [x, y, z]
                 ACCEL_FLAG = True
             elif tag == 0x04:
                 imu_ticks = (fifo_data[i+4] << 24) | (fifo_data[i+3] << 16) | (fifo_data[i+2] << 8) | fifo_data[i+1]
-                imu_timestamp = imu_ticks * 25 / 1000000
+                imu_timestamp = imu_ticks * 25
                 timestamp = imu_timestamp - time_offset
                 TIME_FLAG = True
 
