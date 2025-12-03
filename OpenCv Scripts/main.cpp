@@ -72,6 +72,10 @@ int main()
         return a.score > b.score;
     });
 
+    ///////////////////////////////////////
+    // Non-maximum suppression algorithm //
+    ///////////////////////////////////////
+
     int r = 25;
     int cell_size = r; // r - radius to search around FAST features
     std::map<std::pair<int, int>, std::vector<Key_Point>> grid; // Break image into a grid with cell size == r
