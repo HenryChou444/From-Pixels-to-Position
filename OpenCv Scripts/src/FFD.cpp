@@ -2,29 +2,37 @@
 #include <iostream>
 using namespace std;
 
-vector<char> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {   
+vector<Key_Point> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {   
     int64 FFD_start = cv::getTickCount();       // Take start time to calculate processing time later
 
     cv::copyMakeBorder(img, img, 3, 3, 3, 3, BORDER_REPLICATE); // Use openCV function to add border (mirrored to start)
     cv::Mat Bres_Circ = cv::Mat::zeros(1, 16, CV_64F);  // 1x16 Vector to hold Bresenham circle points
-    vector<Point> corner_Locations; // Vector to hold corner locations
-    std::vector<std::vector<std::vector<char>>> pix_states(
-        img.rows, std::vector<std::vector<char>>(img.cols, std::vector<char>(16, 0))
-    );    // Stores whether each of the interested pixels is brighter, darker, or the same as the center pixel.
+    // vector<Point> corner_Locations; // Vector to hold corner locations
+    // vector<int> scores; // Vector to hold corner scores
+    vector<Key_Point> keypoints; // Vector to hold Key_Point structs
+    // std::vector<std::vector<std::vector<char>>> pix_states(
+    //     img.rows, std::vector<std::vector<char>>(img.cols, std::vector<char>(16, 0))
+    // );    // Stores whether each of the interested pixels is brighter, darker, or the same as the center pixel.
 
     int I; // Center pixel intensity
     int m = 0; // Number of pixels brighter/darker than threshold
-    int n = 12; // Number of required contiguous pixels for corner 
+    int mt = 2; // Temporary counter for pixels greater/less than threshold
+    int n = 9; // Number of required contiguous pixels for corner 
     int c = 0;  // Counter for contiguous pixels
+    int c_start = 0; // Starting index for contiguous counter
     int c_max = 0; // Maximum contiguous counter
-    int t = 30; // Intensity threshold
+    int t = 50; // Intensity threshold
+    int score = 0; // Corner score
+    char last_state = 's'; // Last state of pixel (brighter, darker, same)
 
     // Placeholder for FAST feature detector implementation
     cout << "FAST Feature Detector function called." << endl;
     for (int i = 3; i < img.rows-3; ++i) {
         for (int j = 3; j < img.cols-3; ++j) {
+            Key_Point curr_point;
             m = 0;                      // Reset counter for pixels greater/less than threshold
             c = 0;                      // Reset contiguous counter
+            score = 255;                // Reset score
             I = img.at<uchar>(i, j);    // Center pixel intensity
 
             Bres_Circ.setTo(I); // Initialize all points to the center pixel value
@@ -37,7 +45,7 @@ vector<char> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {
                     m = m + 1;
                 }
             }
-            if (m >= 3){
+            if (m >= mt){
                 Bres_Circ.at<double>(0, 1) = img.at<uchar>(i-3, j+1);
                 Bres_Circ.at<double>(0, 2) = img.at<uchar>(i-2, j+2);
                 Bres_Circ.at<double>(0, 3) = img.at<uchar>(i-1, j+3);
@@ -53,28 +61,84 @@ vector<char> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {
                 
                 for (int k = 0; k < 16; k++) {
                     if (Bres_Circ.at<double>(0, k) > I + t) {
-                        c++;
                         m++;
-                        pix_states[i][j][k] = 'b'; // Mark as brighter
+                        // pix_states[i][j][k] = 'b'; // Mark as brighter
+                        if (c_start ==0){
+                            c_start = k; // Set starting index for contiguous counter
+                        }
+                        if (last_state == 'd') {
+                                c++;
+                        } else {
+                            c = 1; // Reset contiguous counter if last state was 'b'
+                        }
                         if (c > c_max) {
                             c_max = c; // Update maximum contiguous counter
                         }
+                        last_state = 'b'; // Update last state
                     } else if (Bres_Circ.at<double>(0, k) < I - t) {
-                        c++;
-                        pix_states[i][j][k] = 'd'; // Mark as darker
+                        // pix_states[i][j][k] = 'd'; // Mark as darker
                         m++;
+                        if (c_start ==0){
+                            c_start = k; // Set starting index for contiguous counter
+                        }
+                        if (last_state == 'd') {
+                                c++;
+                        } else {
+                            c = 1; // Reset contiguous counter if last state was 'b'
+                        }
                         if (c > c_max) {
                             c_max = c; // Update maximum contiguous counter
                         }
+                        last_state = 'd'; // Update last state
                     } else {
-                        pix_states[i][j][k] = 's'; // Mark as same
+                        // pix_states[i][j][k] = 's'; // Mark as same
                         c = 0; // Reset contiguous counter
+                        c_start = 0; // Reset starting index
+                        last_state = 's'; // Update last state
                     }
                 }
 
+                if (c_start != 0){ // Check for wrap-around case
+                    for (int k = 0; k < c_start; k++) {
+                        if (Bres_Circ.at<double>(0, k) > I + t) {
+                            if (last_state == 'b') {
+                                c++;
+                            } else {
+                                c = 1; // Reset contiguous counter if last state was 'd'
+                            }
+                            if (c > c_max) {
+                                c_max = c; // Update maximum contiguous counter
+                            }
+                            last_state = 'b'; // Update last state
+                        } else if (Bres_Circ.at<double>(0, k) < I - t) {
+                            if (last_state == 'd') {
+                                c++;
+                            } else {
+                                c = 1; // Reset contiguous counter if last state was 'b'
+                            }
+                            if (c > c_max) {
+                                c_max = c; // Update maximum contiguous counter
+                            }
+                            last_state = 'd'; // Update last state
+                        } else {
+                            break; // Stop if a non-contiguous pixel is found
+                        }
+                    }
+                }
+
+
                 if (c_max >= n){
-                    // Mark as corner - for example, set to white
-                    corner_Locations.push_back(Point(j, i));
+                    // Calculate the 'score' of the corner. --> Minimum absolute difference between center pixel and contiguous pixels
+                    for (int k = c_start; k < c_start + c_max; k++) {
+                        int diff = abs(Bres_Circ.at<double>(0, k % 16) - I);
+                        if (diff < score) {
+                            score = diff; // Update corner score
+                        }
+                    }
+                    // cout << "Corner score: " << score << endl;
+                    curr_point.pt = Point(j-3, i-3); // Adjust for border offset
+                    curr_point.score = score;
+                    keypoints.push_back(curr_point);
                 }
             }        
         }
@@ -87,15 +151,20 @@ vector<char> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {
     cout << "Displayed corners detected by FAST." << endl;
     cout << "FAST Feature Detection Time: " << FFD_time << " seconds" << endl;
 
+    ////////////////////////////////////////////
+    // DISPLAY IMAGE WITH CORNERS HIGHLIGHTED //
+    ////////////////////////////////////////////
+
     Mat coloured_img;
     cvtColor(img, coloured_img, COLOR_GRAY2BGR); // Convert to BGR for colored drawing
-    for (const auto& pt : corner_Locations) {   // Draw red circles at corner locations
-        circle(coloured_img, pt, 1, Scalar(0, 0, 255), -1); // Draw red circles at corner locations
+    for (const auto& kp : keypoints) {   // Draw red circles at corner locations
+        circle(coloured_img, Point(kp.pt.x, kp.pt.y), 1, Scalar(0, 0, 255), -1); // Draw red circles at corner locations
     }
-    string full_path = "C:\\Users\\Alec\\Documents\\DTU\\E25\\Image Analysis with Microcomputer\\Exercises\\FAST Results\\" + file_name;
+    
+    string parameters = "_mt" + to_string(mt) + "_t" + to_string(t) + "_n" + to_string(n);
+    string full_path = "C:\\Users\\Alec\\Documents\\DTU\\E25\\Image Analysis with Microcomputer\\Exercises\\FAST Pyramid\\" + file_name + parameters + ".png";
     cout << "Saving FAST features to: " << full_path << endl;
     imwrite(full_path, coloured_img); // Save the output image
-    
 
     // while (1) {
     //     imshow("Corners", coloured_img);
@@ -107,11 +176,13 @@ vector<char> FAST_FEATURE_DETECTOR(Mat& img, const std::string& file_name) {
     //     // Save image
     //     imwrite("C:\\Users\\Alec\\Documents\\DTU\\E25\\Image Analysis with Microcomputer\\Exercises\\corners.png", coloured_img);
     // }
+    ////////////////////////////////////////////
+
     // If no corners were found, return an empty vector
-    if (corner_Locations.empty()) {
-        return std::vector<char>();
+    if (keypoints.empty()) {
+        return vector<Key_Point>();
     }
     // Return the 16-element state vector for the first detected corner.
     // pix_states is indexed as [row][col] (i = y, j = x), while Point stores (x,y).
-    return pix_states.at(corner_Locations[0].y).at(corner_Locations[0].x);
+    return keypoints;
 }
