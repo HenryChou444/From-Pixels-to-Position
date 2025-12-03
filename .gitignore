@@ -1,3 +1,7 @@
+
+
+
+
 # Prerequisites
 *.d
 # PDF Files
@@ -8,6 +12,11 @@
 *.o
 *.obj
 
+# other
+*.exec
+*.exe
+*Makefile
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -17,6 +26,9 @@
 
 # Debugger Files
 *.pdb
+
+#autosave files
+*.autosave
 
 # Compiled Dynamic libraries
 *.so
@@ -52,16 +64,25 @@ CTestTestfile.cmake
 build/
 out/
 
-# Visual Studio
+# Visual Studio (keep project/solution files; ignore user/cache/build)
 .vs/
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.sln
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.vcxproj.user
+Debug/
+Release/
+x64/
+x86/
+ipch/
+*.VC.db
+*.opendb
+*.ipch
+# Keep these in Git:
+!*.sln
+!*.vcxproj
+!*.vcxproj.filters
 
 # Python
 __pycache__/
